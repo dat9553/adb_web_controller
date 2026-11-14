@@ -35,6 +35,10 @@ button:active { background:#cbd8e5; }
 <h2>ADB Controller</h2>
 
 <section class="panel">
+  <div id="status" role="status" aria-live="polite">Ready — connect to the K30 first.</div>
+</section>
+
+<section class="panel">
   <div class="panel-title">Target device</div>
   <label for="ip">Device IP or serial</label>
   <input id="ip" value="192.168.0.101" autocomplete="off"
@@ -75,10 +79,6 @@ button:active { background:#cbd8e5; }
     <input id="tapX" type="number" min="0" value="540" aria-label="Tap X">
     <input id="tapY" type="number" min="0" value="960" aria-label="Tap Y">
   </div>
-</section>
-
-<section class="panel">
-  <div id="status">Ready — connect to the K30 first.</div>
 </section>
 
 <section class="panel">
