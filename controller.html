@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ADB Controller</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; padding:14px; background:#f1f3f5; color:#202124;
+       font:16px Arial,sans-serif; }
+main { max-width:440px; margin:0 auto; }
+h2 { text-align:center; margin:8px 0 16px; }
+.panel { background:#fff; border-radius:12px; padding:14px;
+         margin-bottom:12px; box-shadow:0 1px 3px #00000012; }
+.panel-title { font-weight:bold; margin-bottom:10px; }
+input { width:100%; padding:12px; margin:5px 0 10px; border:1px solid #c8cdd2;
+        border-radius:8px; font-size:16px; background:white; }
+button { border:0; border-radius:9px; padding:14px 8px; min-height:54px;
+         background:#e5e9ed; color:#202124; font-size:17px;
+         touch-action:manipulation; }
+button:active { background:#cbd8e5; }
+.primary { width:100%; background:#1769aa; color:white; }
+.system { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.dpad { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+.dpad button { min-height:66px; font-size:25px; }
+.empty { visibility:hidden; }
+.coords { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+#status { min-height:22px; text-align:center; overflow-wrap:anywhere;
+          color:#555; font-size:14px; }
+.hint { color:#666; font-size:12px; line-height:1.4; }
+</style>
+</head>
+<body>
+<main>
+<h2>ADB Controller</h2>
+
+<section class="panel">
+  <div class="panel-title">Target device</div>
+  <label for="ip">Device IP or serial</label>
+  <input id="ip" value="192.168.0.101" autocomplete="off"
+         placeholder="IP address or ADB serial">
+  <label for="port">Port</label>
+  <input id="port" value="5555" inputmode="numeric" autocomplete="off"
+         placeholder="Leave empty when using device serial">
+  <button class="primary" onclick="connectDevice()">Connect</button>
+  <p class="hint">Leave Port empty when the value above is already an ADB device serial (for example, a USB serial).</p>
+</section>
+
+<section class="panel">
+  <div class="panel-title">Navigation</div>
+  <div class="system">
+    <button onclick="sendKey(4)">Back</button>
+    <button onclick="sendKey(3)">Home</button>
+    <button onclick="sendKey(187)">Recent</button>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-title">Swipe</div>
+  <div class="dpad">
+    <div class="empty"></div>
+    <button onclick="sendSwipe('up')">▲</button>
+    <div class="empty"></div>
+    <button onclick="sendSwipe('left')">◀</button>
+    <button onclick="sendTap()">●</button>
+    <button onclick="sendSwipe('right')">▶</button>
+    <div class="empty"></div>
+    <button onclick="sendSwipe('down')">▼</button>
+    <div class="empty"></div>
+  </div>
+  <label for="duration">Swipe duration (ms)</label>
+  <input id="duration" type="number" min="50" max="3000" value="300">
+  <div class="panel-title">Tap coordinates</div>
+  <div class="coords">
+    <input id="tapX" type="number" min="0" value="540" aria-label="Tap X">
+    <input id="tapY" type="number" min="0" value="960" aria-label="Tap Y">
+  </div>
+</section>
+
+<section class="panel">
+  <div id="status">Ready — connect to the K30 first.</div>
+</section>
+
+<section class="panel">
+  <button class="primary" onclick="window.location.href='/touchpad.html'">
+    Touchpad mode
+  </button>
+</section>
+</main>
+
+<script>
+async function api(path, payload) {
+  const status = document.getElementById("status");
+  status.textContent = "Sending...";
+  try {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) {
+      throw new Error(result.message || ("HTTP " + response.status));
+    }
+    status.textContent = result.message || "Done";
+  } catch (e) {
+    status.textContent = "Error: " + e.message;
+  }
+}
+
+function connectDevice() {
+  const ip = document.getElementById("ip").value.trim();
+  const port = document.getElementById("port").value.trim();
+  if (!ip) {
+    document.getElementById("status").textContent = "Enter an IP or device serial.";
+    return;
+  }
+  api("/api/connect", {ip: ip, port: port});
+}
+
+function sendSwipe(direction) {
+  const duration = Number(document.getElementById("duration").value || 300);
+  api("/api/swipe", {direction: direction, duration: duration});
+}
+
+function sendTap() {
+  const x = Number(document.getElementById("tapX").value);
+  const y = Number(document.getElementById("tapY").value);
+  api("/api/tap", {x: x, y: y});
+}
+
+function sendKey(keycode) {
+  api("/api/keyevent", {keycode: keycode});
+}
+</script>
+</body>
+</html>
