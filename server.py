@@ -17,6 +17,8 @@ HTML_FILE = Path(__file__).with_name("controller.html")
 
 _selected_device = None
 _state_lock = threading.Lock()
+_speed_hold_device = None
+_speed_hold_lock = threading.Lock()
 
 # Keep the original adb_swipe.py vertical swipe coordinates.
 SWIPES = {
@@ -27,6 +29,8 @@ SWIPES = {
     "right": (180, 960, 900, 960),
 }
 ALLOWED_KEYEVENTS = {3, 4, 187}  # Home, Back, Recent Apps
+SPEED_HOLD_X = 950
+SPEED_HOLD_Y = 1070
 
 
 def run_adb(args, timeout=15):
@@ -79,9 +83,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
-        global _selected_device
+        global _selected_device, _speed_hold_device
         path = urlparse(self.path).path
-        if path not in ("/api/connect", "/api/swipe", "/api/tap", "/api/keyevent"):
+        if path not in ("/api/connect", "/api/swipe", "/api/tap", "/api/keyevent", "/api/hold"):
             json_response(self, 404, {"ok": False, "message": "Unknown endpoint"})
             return
 
@@ -148,6 +152,58 @@ class Handler(BaseHTTPRequestHandler):
             device = _selected_device
         if not device:
             json_response(self, 409, {"ok": False, "message": "Connect to the K30 first"})
+            return
+
+        if path == "/api/hold":
+            action = str(data.get("action", "")).lower()
+            if action not in ("down", "up"):
+                json_response(self, 400, {"ok": False, "message": "Hold action must be down or up"})
+                return
+
+            with _speed_hold_lock:
+                if action == "down":
+                    # If the selected device changed, release the old touch before
+                    # starting the hold on the newly selected device.
+                    if _speed_hold_device and _speed_hold_device != device:
+                        old_device = _speed_hold_device
+                        code, out, err = run_adb([
+                            "-s", old_device, "shell", "input", "motionevent", "UP",
+                            str(SPEED_HOLD_X), str(SPEED_HOLD_Y)
+                        ])
+                        if code != 0:
+                            json_response(self, 502, {"ok": False, "message": err or out or "Could not release previous hold"})
+                            return
+                        _speed_hold_device = None
+
+                    if _speed_hold_device == device:
+                        json_response(self, 200, {"ok": True, "message": "Speed hold is active"})
+                        return
+
+                    code, out, err = run_adb([
+                        "-s", device, "shell", "input", "motionevent", "DOWN",
+                        str(SPEED_HOLD_X), str(SPEED_HOLD_Y)
+                    ])
+                    if code == 0:
+                        _speed_hold_device = device
+                        json_response(self, 200, {"ok": True, "message": "Speed hold active at 950, 1070"})
+                    else:
+                        json_response(self, 502, {"ok": False, "message": err or out or "Could not start speed hold"})
+                    return
+
+                if not _speed_hold_device:
+                    json_response(self, 200, {"ok": True, "message": "Speed hold is not active"})
+                    return
+
+                held_device = _speed_hold_device
+                code, out, err = run_adb([
+                    "-s", held_device, "shell", "input", "motionevent", "UP",
+                    str(SPEED_HOLD_X), str(SPEED_HOLD_Y)
+                ])
+                if code == 0:
+                    _speed_hold_device = None
+                    json_response(self, 200, {"ok": True, "message": "Speed hold released"})
+                else:
+                    json_response(self, 502, {"ok": False, "message": err or out or "Could not release speed hold"})
             return
 
         if path == "/api/swipe":

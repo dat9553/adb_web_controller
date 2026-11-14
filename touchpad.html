@@ -14,8 +14,10 @@ button { border:0; border-radius:9px; padding:12px 16px; background:#e5e9ed; fon
 #pad { height:65vh; min-height:300px; padding:10px; background:#fff; border:2px solid #c8cdd2;
        border-radius:16px; display:flex; flex-direction:column; color:#777; text-align:center;
        user-select:none; -webkit-user-select:none; }
-#gesture-area { flex:1; display:flex; align-items:center; justify-content:center;
+#gesture-area { position:relative; flex:1; display:flex; align-items:center; justify-content:center;
                 touch-action:none; }
+#speed-toggle { position:absolute; right:0; top:50%; transform:translateY(-50%); min-width:92px;
+                padding:12px 8px; z-index:1; touch-action:manipulation; }
 #pad.active { background:#eaf3fb; border-color:#1769aa; }
 #navigation { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
 #navigation button { padding:12px 6px; touch-action:manipulation; }
@@ -30,7 +32,9 @@ p { color:#666; font-size:13px; line-height:1.4; }
   <strong>Touchpad mode</strong>
 </header>
 <div id="pad" role="application" aria-label="Touchpad: tap or swipe to control the device">
-  <div id="gesture-area">Touch or click and drag here</div>
+  <div id="gesture-area">Touch or click and drag here
+    <button id="speed-toggle" type="button" aria-pressed="false" onclick="toggleSpeedHold()">Speed x2</button>
+  </div>
   <div id="navigation" aria-label="Device navigation">
     <button type="button" onclick="sendKey(187)">Recent</button>
     <button type="button" onclick="sendKey(3)">Home</button>
@@ -44,12 +48,15 @@ p { color:#666; font-size:13px; line-height:1.4; }
 const pad = document.getElementById("pad");
 const gestureArea = document.getElementById("gesture-area");
 const status = document.getElementById("status");
+const speedToggle = document.getElementById("speed-toggle");
 const TAP_MAX_DISTANCE = 12;
 const SWIPE_MIN_DISTANCE = 30;
 // Match the existing controller.html tap defaults / 1080x1920 coordinate space.
 const TAP_X = 540;
 const TAP_Y = 960;
 let activeGesture = null;
+let speedHeld = false;
+let speedToggleBusy = false;
 
 async function sendAction(path, payload) {
   status.textContent = "Sending...";
@@ -64,14 +71,44 @@ async function sendAction(path, payload) {
       throw new Error(result.message || ("HTTP " + response.status));
     }
     status.textContent = result.message || "Done";
+    return true;
   } catch (error) {
     status.textContent = "Error: " + error.message;
+    return false;
   }
 }
 
 function sendKey(keycode) {
   sendAction("/api/keyevent", {keycode: keycode});
 }
+
+async function toggleSpeedHold() {
+  if (speedToggleBusy) return;
+  speedToggleBusy = true;
+  speedToggle.disabled = true;
+  const nextHeldState = !speedHeld;
+  const succeeded = await sendAction("/api/hold", {action: nextHeldState ? "down" : "up"});
+  if (succeeded) {
+    speedHeld = nextHeldState;
+    speedToggle.textContent = speedHeld ? "Speed x1" : "Speed x2";
+    speedToggle.setAttribute("aria-pressed", String(speedHeld));
+  }
+  speedToggle.disabled = false;
+  speedToggleBusy = false;
+}
+
+// Keep the fixed touch from remaining down if the touchpad page is closed.
+window.addEventListener("pagehide", () => {
+  if (speedHeld) {
+    navigator.sendBeacon("/api/hold", new Blob(
+      [JSON.stringify({action: "up"})], {type: "application/json"}
+    ));
+  }
+});
+
+speedToggle.addEventListener("pointerdown", (event) => event.stopPropagation());
+speedToggle.addEventListener("pointerup", (event) => event.stopPropagation());
+speedToggle.addEventListener("click", (event) => event.stopPropagation());
 
 gestureArea.addEventListener("pointerdown", (event) => {
   if (activeGesture || (event.pointerType === "mouse" && event.button !== 0)) return;
