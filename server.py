@@ -63,6 +63,28 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/api/status":
+            with _state_lock:
+                device = _selected_device
+            if not device:
+                json_response(self, 200, {"ok": True, "connected": False, "message": "Not connected to an ADB device."})
+                return
+
+            code, out, err = run_adb(["devices"])
+            if code != 0:
+                json_response(self, 502, {"ok": False, "connected": False, "message": err or out or "Could not check ADB connection"})
+                return
+            states = {}
+            for line in out.splitlines()[1:]:
+                fields = line.split()
+                if len(fields) >= 2:
+                    states[fields[0]] = fields[1]
+            if states.get(device) == "device":
+                json_response(self, 200, {"ok": True, "connected": True, "device": device, "message": "Connected: " + device})
+            else:
+                json_response(self, 200, {"ok": True, "connected": False, "device": device, "message": "Disconnected: " + device})
+            return
+
         if path in ("/", "/controller.html", "/touchpad.html"):
             filename = "touchpad.html" if path == "/touchpad.html" else "controller.html"
             target_file = HTML_FILE.with_name(filename)
@@ -259,6 +281,6 @@ if __name__ == "__main__":
         print("WARNING: ADB executable not found at: " + ADB)
         print("Edit ADB in server.py to match your adb.exe location.")
     print("ADB Controller server: http://0.0.0.0:%d/" % PORT)
-    print("Open http://<PC-LAN-IP>:%d/ on CPTR on the J2 Prime." % PORT)
+    print("Open http://<PC-LAN-IP>:%d/ on CPTR on the J2 Prime.")
     print("Press Ctrl+C to stop.")
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
