@@ -22,8 +22,8 @@ _speed_hold_lock = threading.Lock()
 
 # Keep the original adb_swipe.py vertical swipe coordinates.
 SWIPES = {
-    "up":    (540, 1600, 540, 200),
-    "down":  (540, 400, 540, 1600),
+    "up":    (540, 1500, 540, 200),
+    "down":  (540, 400, 540, 1500),
     # Horizontal defaults for the same 1080px-wide coordinate space.
     "left":  (900, 960, 180, 960),
     "right": (180, 960, 900, 960),
