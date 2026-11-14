@@ -20,6 +20,9 @@ button { border:0; border-radius:9px; padding:14px 8px; min-height:54px;
          touch-action:manipulation; }
 button:active { background:#cbd8e5; }
 .primary { width:100%; background:#1769aa; color:white; }
+.device-row { display:grid; grid-template-columns:minmax(0, 1fr) 92px 92px; gap:8px; align-items:center; }
+.device-row input { min-width:0; margin:0; padding:12px 8px; }
+.device-row button { min-height:44px; padding:10px 8px; font-size:15px; }
 .system { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
 .dpad { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
 .dpad button { min-height:66px; font-size:25px; }
@@ -40,13 +43,14 @@ button:active { background:#cbd8e5; }
 
 <section class="panel">
   <div class="panel-title">Target device</div>
-  <label for="ip">Device IP or serial</label>
-  <input id="ip" value="192.168.0.101" autocomplete="off"
-         placeholder="IP address or ADB serial">
-  <label for="port">Port</label>
-  <input id="port" value="5555" inputmode="numeric" autocomplete="off"
-         placeholder="Leave empty when using device serial">
-  <button class="primary" onclick="connectDevice()">Connect</button>
+  <label for="ip">Device IP or serial:Port</label>
+  <div class="device-row">
+    <input id="ip" value="192.168.0.101" autocomplete="off"
+           placeholder="IP address or ADB serial" aria-label="Device IP or serial">
+    <input id="port" value="5555" inputmode="numeric" autocomplete="off"
+           placeholder="Port" aria-label="Port">
+    <button class="primary" onclick="connectDevice()">Connect</button>
+  </div>
   <p class="hint">Leave Port empty when the value above is already an ADB device serial (for example, a USB serial).</p>
 </section>
 
