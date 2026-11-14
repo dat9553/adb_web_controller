@@ -93,9 +93,23 @@ button:active { background:#cbd8e5; }
 </main>
 
 <script>
+const statusEl = document.getElementById("status");
+
+async function refreshStatus() {
+  try {
+    const response = await fetch("/api/status", {cache: "no-store"});
+    const result = await response.json();
+    if (!response.ok || !result.ok) {
+      throw new Error(result.message || ("HTTP " + response.status));
+    }
+    statusEl.textContent = result.message || "Ready — connect to the K30 first.";
+  } catch (e) {
+    statusEl.textContent = "Ready — connect to the K30 first.";
+  }
+}
+
 async function api(path, payload) {
-  const status = document.getElementById("status");
-  status.textContent = "Sending...";
+  statusEl.textContent = "Sending...";
   try {
     const response = await fetch(path, {
       method: "POST",
@@ -106,9 +120,11 @@ async function api(path, payload) {
     if (!response.ok || !result.ok) {
       throw new Error(result.message || ("HTTP " + response.status));
     }
-    status.textContent = result.message || "Done";
+    statusEl.textContent = result.message || "Done";
+    return true;
   } catch (e) {
-    status.textContent = "Error: " + e.message;
+    statusEl.textContent = "Error: " + e.message;
+    return false;
   }
 }
 
@@ -116,7 +132,7 @@ function connectDevice() {
   const ip = document.getElementById("ip").value.trim();
   const port = document.getElementById("port").value.trim();
   if (!ip) {
-    document.getElementById("status").textContent = "Enter an IP or device serial.";
+    statusEl.textContent = "Enter an IP or device serial.";
     return;
   }
   api("/api/connect", {ip: ip, port: port});
@@ -136,6 +152,8 @@ function sendTap() {
 function sendKey(keycode) {
   api("/api/keyevent", {keycode: keycode});
 }
+
+window.addEventListener("DOMContentLoaded", refreshStatus);
 </script>
 </body>
 </html>
