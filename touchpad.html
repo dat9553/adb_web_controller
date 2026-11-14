@@ -13,7 +13,9 @@ header { display:flex; align-items:center; justify-content:space-between; margin
 button { border:0; border-radius:9px; padding:12px 16px; background:#e5e9ed; font-size:15px; }
 #pad { height:65vh; min-height:300px; background:#fff; border:2px solid #c8cdd2;
        border-radius:16px; display:flex; align-items:center; justify-content:center;
-       color:#777; text-align:center; touch-action:none; user-select:none; }
+       color:#777; text-align:center; touch-action:none; user-select:none;
+       -webkit-user-select:none; }
+#pad.active { background:#eaf3fb; border-color:#1769aa; }
 #status { text-align:center; color:#555; font-size:13px; min-height:20px; margin-top:12px; }
 p { color:#666; font-size:13px; line-height:1.4; }
 </style>
@@ -24,9 +26,88 @@ p { color:#666; font-size:13px; line-height:1.4; }
   <button onclick="window.location.href='/'">← Controller</button>
   <strong>Touchpad mode</strong>
 </header>
-<div id="pad">Touchpad area<br>Touch and drag here</div>
-<div id="status">Touchpad interface placeholder</div>
-<p>This page is the separate touchpad screen. The touch gesture handling will be added next.</p>
+<div id="pad" role="application" aria-label="Touchpad: tap or swipe to control the device">
+  Touch or click and drag here
+</div>
+<div id="status" role="status" aria-live="polite">Ready — connect to the device first.</div>
+<p>Tap to send a tap to the device center. Swipe to send an up, down, left, or right gesture.</p>
 </main>
+<script>
+const pad = document.getElementById("pad");
+const status = document.getElementById("status");
+const TAP_MAX_DISTANCE = 12;
+const SWIPE_MIN_DISTANCE = 30;
+// Match the existing controller.html tap defaults / 1080x1920 coordinate space.
+const TAP_X = 540;
+const TAP_Y = 960;
+let activeGesture = null;
+
+async function sendAction(path, payload) {
+  status.textContent = "Sending...";
+  try {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) {
+      throw new Error(result.message || ("HTTP " + response.status));
+    }
+    status.textContent = result.message || "Done";
+  } catch (error) {
+    status.textContent = "Error: " + error.message;
+  }
+}
+
+pad.addEventListener("pointerdown", (event) => {
+  if (activeGesture || (event.pointerType === "mouse" && event.button !== 0)) return;
+  event.preventDefault();
+  activeGesture = {
+    pointerId: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    startedAt: Date.now()
+  };
+  pad.classList.add("active");
+  pad.setPointerCapture(event.pointerId);
+});
+
+pad.addEventListener("pointerup", (event) => {
+  if (!activeGesture || event.pointerId !== activeGesture.pointerId) return;
+  event.preventDefault();
+  const gesture = activeGesture;
+  activeGesture = null;
+  pad.classList.remove("active");
+
+  const dx = event.clientX - gesture.x;
+  const dy = event.clientY - gesture.y;
+  const distance = Math.hypot(dx, dy);
+  const elapsed = Math.max(50, Math.min(3000, Date.now() - gesture.startedAt));
+
+  if (distance <= TAP_MAX_DISTANCE && elapsed <= 500) {
+    sendAction("/api/tap", {x: TAP_X, y: TAP_Y});
+  } else if (distance >= SWIPE_MIN_DISTANCE) {
+    let direction;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      direction = dx < 0 ? "left" : "right";
+    } else {
+      direction = dy < 0 ? "up" : "down";
+    }
+    sendAction("/api/swipe", {direction: direction, duration: elapsed});
+  } else {
+    status.textContent = "Gesture not recognized — tap or swipe farther.";
+  }
+});
+
+function cancelGesture(event) {
+  if (!activeGesture || event.pointerId !== activeGesture.pointerId) return;
+  activeGesture = null;
+  pad.classList.remove("active");
+  status.textContent = "Gesture cancelled.";
+}
+pad.addEventListener("pointercancel", cancelGesture);
+pad.addEventListener("lostpointercapture", cancelGesture);
+</script>
 </body>
 </html>
