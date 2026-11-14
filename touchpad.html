@@ -21,7 +21,6 @@ button { border:0; border-radius:9px; padding:12px 16px; background:#e5e9ed; fon
 #pad.active { background:#eaf3fb; border-color:#1769aa; }
 #navigation { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
 #navigation button { padding:12px 6px; touch-action:manipulation; }
-#status { text-align:center; color:#555; font-size:13px; min-height:20px; margin-top:12px; }
 p { color:#666; font-size:13px; line-height:1.4; }
 </style>
 </head>
@@ -41,13 +40,11 @@ p { color:#666; font-size:13px; line-height:1.4; }
     <button type="button" onclick="sendKey(4)">Back</button>
   </div>
 </div>
-<div id="status" role="status" aria-live="polite">Ready — connect to the device first.</div>
 <p>Tap to send a tap to the device center. Swipe to send an up, down, left, or right gesture.</p>
 </main>
 <script>
 const pad = document.getElementById("pad");
 const gestureArea = document.getElementById("gesture-area");
-const status = document.getElementById("status");
 const speedToggle = document.getElementById("speed-toggle");
 const TAP_MAX_DISTANCE = 12;
 const SWIPE_MIN_DISTANCE = 30;
@@ -59,7 +56,6 @@ let speedHeld = false;
 let speedToggleBusy = false;
 
 async function sendAction(path, payload) {
-  status.textContent = "Sending...";
   try {
     const response = await fetch(path, {
       method: "POST",
@@ -70,10 +66,8 @@ async function sendAction(path, payload) {
     if (!response.ok || !result.ok) {
       throw new Error(result.message || ("HTTP " + response.status));
     }
-    status.textContent = result.message || "Done";
     return true;
   } catch (error) {
-    status.textContent = "Error: " + error.message;
     return false;
   }
 }
@@ -145,8 +139,6 @@ gestureArea.addEventListener("pointerup", (event) => {
       direction = dy < 0 ? "up" : "down";
     }
     sendAction("/api/swipe", {direction: direction, duration: elapsed});
-  } else {
-    status.textContent = "Gesture not recognized — tap or swipe farther.";
   }
 });
 
@@ -154,7 +146,6 @@ function cancelGesture(event) {
   if (!activeGesture || event.pointerId !== activeGesture.pointerId) return;
   activeGesture = null;
   pad.classList.remove("active");
-  status.textContent = "Gesture cancelled.";
 }
 gestureArea.addEventListener("pointercancel", cancelGesture);
 gestureArea.addEventListener("lostpointercapture", cancelGesture);
