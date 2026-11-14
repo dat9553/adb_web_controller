@@ -11,11 +11,14 @@ body { margin:0; padding:14px; background:#f1f3f5; color:#202124;
 main { max-width:440px; margin:0 auto; }
 header { display:flex; align-items:center; justify-content:space-between; margin:4px 0 14px; }
 button { border:0; border-radius:9px; padding:12px 16px; background:#e5e9ed; font-size:15px; }
-#pad { height:65vh; min-height:300px; background:#fff; border:2px solid #c8cdd2;
-       border-radius:16px; display:flex; align-items:center; justify-content:center;
-       color:#777; text-align:center; touch-action:none; user-select:none;
-       -webkit-user-select:none; }
+#pad { height:65vh; min-height:300px; padding:10px; background:#fff; border:2px solid #c8cdd2;
+       border-radius:16px; display:flex; flex-direction:column; color:#777; text-align:center;
+       user-select:none; -webkit-user-select:none; }
+#gesture-area { flex:1; display:flex; align-items:center; justify-content:center;
+                touch-action:none; }
 #pad.active { background:#eaf3fb; border-color:#1769aa; }
+#navigation { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+#navigation button { padding:12px 6px; touch-action:manipulation; }
 #status { text-align:center; color:#555; font-size:13px; min-height:20px; margin-top:12px; }
 p { color:#666; font-size:13px; line-height:1.4; }
 </style>
@@ -27,13 +30,19 @@ p { color:#666; font-size:13px; line-height:1.4; }
   <strong>Touchpad mode</strong>
 </header>
 <div id="pad" role="application" aria-label="Touchpad: tap or swipe to control the device">
-  Touch or click and drag here
+  <div id="gesture-area">Touch or click and drag here</div>
+  <div id="navigation" aria-label="Device navigation">
+    <button type="button" onclick="sendKey(187)">Recent</button>
+    <button type="button" onclick="sendKey(3)">Home</button>
+    <button type="button" onclick="sendKey(4)">Back</button>
+  </div>
 </div>
 <div id="status" role="status" aria-live="polite">Ready — connect to the device first.</div>
 <p>Tap to send a tap to the device center. Swipe to send an up, down, left, or right gesture.</p>
 </main>
 <script>
 const pad = document.getElementById("pad");
+const gestureArea = document.getElementById("gesture-area");
 const status = document.getElementById("status");
 const TAP_MAX_DISTANCE = 12;
 const SWIPE_MIN_DISTANCE = 30;
@@ -60,7 +69,11 @@ async function sendAction(path, payload) {
   }
 }
 
-pad.addEventListener("pointerdown", (event) => {
+function sendKey(keycode) {
+  sendAction("/api/keyevent", {keycode: keycode});
+}
+
+gestureArea.addEventListener("pointerdown", (event) => {
   if (activeGesture || (event.pointerType === "mouse" && event.button !== 0)) return;
   event.preventDefault();
   activeGesture = {
@@ -70,10 +83,10 @@ pad.addEventListener("pointerdown", (event) => {
     startedAt: Date.now()
   };
   pad.classList.add("active");
-  pad.setPointerCapture(event.pointerId);
+  gestureArea.setPointerCapture(event.pointerId);
 });
 
-pad.addEventListener("pointerup", (event) => {
+gestureArea.addEventListener("pointerup", (event) => {
   if (!activeGesture || event.pointerId !== activeGesture.pointerId) return;
   event.preventDefault();
   const gesture = activeGesture;
@@ -106,8 +119,8 @@ function cancelGesture(event) {
   pad.classList.remove("active");
   status.textContent = "Gesture cancelled.";
 }
-pad.addEventListener("pointercancel", cancelGesture);
-pad.addEventListener("lostpointercapture", cancelGesture);
+gestureArea.addEventListener("pointercancel", cancelGesture);
+gestureArea.addEventListener("lostpointercapture", cancelGesture);
 </script>
 </body>
 </html>
